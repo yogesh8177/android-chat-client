@@ -8,5 +8,6 @@ public class User {
     public String Name;
     public String Email;
     public String Mobile;
+    public String Status;
     public String Token;
 }

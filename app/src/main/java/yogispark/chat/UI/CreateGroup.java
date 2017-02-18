@@ -17,8 +17,11 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Locale;
 
 import yogispark.chat.Adapters.SelectedContactsAdapter;
 import yogispark.chat.DataBase.SqlHelper;
@@ -110,6 +113,7 @@ public class CreateGroup extends AppCompatActivity {
         Contact contact = new Contact();
         contact.Contact_Id = intent.getStringExtra("GroupId");
         contact.Join_Date = intent.getStringExtra("CreatedAt");
+
         contact.Type = Constants.CONTACT_TYPE_GROUP;
         contact.Name = group_name.getText().toString();
         contact.Status = "Group status";
@@ -143,9 +147,9 @@ public class CreateGroup extends AppCompatActivity {
             message.Category = Constants.CATEGORY_GROUP_MESSAGE;
             message.PostedTime = contact.Join_Date;
 
+
             helper.insertMessage(message,Constants.MESSAGE_RECEIVE); //insert welcome message for new group created
-
-
+            sendGroupBroadCast(contact.Name,message); //Send broadcast to messageView
 
             return null;
         }
@@ -155,6 +159,24 @@ public class CreateGroup extends AppCompatActivity {
             Toast.makeText(CreateGroup.this,"Group successfully created!", Toast.LENGTH_SHORT).show();
             finish();
         }
+    }
+
+    void sendGroupBroadCast(String GroupName, Message message){
+        Intent broadcast = new Intent();
+        broadcast.setAction(Constants.NEW_MESSAGE_FILTER);
+        broadcast.putExtra("message_type",Constants.NEW_MESSAGE);
+
+        broadcast.putExtra("category", Constants.CATEGORY_GROUP_MESSAGE);
+        broadcast.putExtra("contact_id", message.Contact_Id);
+        broadcast.putExtra("message_id", message.Message_Id);
+        broadcast.putExtra("name", GroupName);
+        broadcast.putExtra("sender_name", GroupName);
+        broadcast.putExtra("from", message.From);
+        broadcast.putExtra("body", message.Body);
+        broadcast.putExtra("type", "group-create");
+        broadcast.putExtra("posted_time", message.PostedTime);
+
+        sendBroadcast(broadcast);
     }
 
 

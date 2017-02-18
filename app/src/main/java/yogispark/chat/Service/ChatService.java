@@ -5,7 +5,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.IBinder;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -18,8 +20,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.net.URISyntaxException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Locale;
 
 import yogispark.chat.DataBase.SqlHelper;
 import yogispark.chat.Models.Contact;
@@ -34,10 +38,10 @@ import yogispark.chat.Utility.Tools;
 public class ChatService extends Service {
 
     private Socket socket;
-    private BroadcastReceiver receiver, group_receiver;
+    private BroadcastReceiver receiver, group_receiver, status_receiver, user_setting;
     SqlHelper db;
     User user;
-    private Emitter.Listener onConnected, onDisconnected, onPrivateTyping, onGroupTyping, onPrivateMessage, onGroupMessage, onPrivatePosted, onGroupPosted, onPrivateDeliveryReceipt, onGroupDeliveryReceipt, onGroupCreated, onGroupMembersAdded, onGroupMembersRemoved, onAddedToNewGroup;
+    private Emitter.Listener onConnected, onAuthenticated, onDisconnected, onUserOnlineStatus, onStatusChanged, onPrivateTyping, onGroupTyping, onPrivateMessage, onGroupMessage, onPrivatePosted, onGroupPosted, onPrivateDeliveryReceipt, onGroupDeliveryReceipt, onGroupCreated, onGroupMembersAdded, onGroupMembersRemoved, onAddedToNewGroup;
 
     public ChatService() {
 
@@ -100,6 +104,28 @@ public class ChatService extends Service {
         filter1.addAction(Constants.GROUP_FILTER);
         registerReceiver(group_receiver,filter1);
 
+        status_receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                handleStatusBroadcast(intent);
+            }
+        };
+
+        IntentFilter filter2 = new IntentFilter();
+        filter2.addAction(Constants.CONTACT_STATUS_FILTER);
+        registerReceiver(status_receiver,filter2);
+
+        user_setting = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                handleUserSettingBroadcast(intent);
+            }
+        };
+
+        IntentFilter filter3 = new IntentFilter();
+        filter3.addAction(Constants.UPDATE_USER_SETTING_FILTER);
+        registerReceiver(user_setting,filter3);
+
     }
 
 
@@ -107,7 +133,10 @@ public class ChatService extends Service {
         socket = IO.socket(Constants.SOCKET_URL);
         socket.connect();
         socket.on("connected", onConnected);
+        socket.on("authenticated", onAuthenticated);
         socket.on("disconnected", onDisconnected);
+        socket.on("user-online-status", onUserOnlineStatus); // User online/offline status
+        socket.on("status-changed", onStatusChanged); //User status
         socket.on("private-message", onPrivateMessage);
         socket.on("private-posted", onPrivatePosted);
         socket.on("private-delivery-receipt", onPrivateDeliveryReceipt);
@@ -142,10 +171,95 @@ public class ChatService extends Service {
             }
         };
 
+        onAuthenticated = new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                ArrayList<Message> PendingMessages = db.getPendingMessages();
+
+                for(Message message:PendingMessages){
+                    JSONObject arg = new JSONObject();
+                    try {
+                        arg.put("from", message.From);
+                        arg.put("to", message.Contact_Id);
+                        arg.put("body", message.Body);
+                        arg.put("type", message.Type);
+
+                        socket.emit("private-message", arg);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+                SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+                if(preferences.getBoolean("status_update",false)){
+                    JSONObject arg = new JSONObject();
+                    try {
+                        arg.put("user_id", user.ID);
+                        arg.put("status", user.Status);
+                        Log.d("Status pref: ", ""+preferences.getBoolean("status_update", false));
+                        socket.emit("status-update", arg);Log.d("Updating status", arg.getString("status"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+
+            }
+        };
+
         onDisconnected = new Emitter.Listener() {
             @Override
             public void call(Object... args) {
                 JSONObject data = (JSONObject) args[0];
+            }
+        };
+
+        onUserOnlineStatus = new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                JSONObject data = (JSONObject) args[0];
+                try {
+                    boolean status = data.getBoolean("status");
+                    String contact_id = data.getString("user_id");
+                    Intent intent = new Intent();
+                    intent.setAction(Constants.CONTACT_STATUS_FILTER);
+                    intent.putExtra("category", Constants.CHECK_CONTACT_ONLINE_RESULT);
+                    intent.putExtra("status",status);
+                    intent.putExtra("contact_id", contact_id);
+Log.d("USer status", ""+status);
+                    sendBroadcast(intent);
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        onStatusChanged = new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                JSONObject data = (JSONObject) args[0];
+
+                try {
+                    String status = data.getString("status");
+                    String contact_id = data.getString("user_id");
+
+                    SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+                    if(contact_id.equals(user.ID)) {
+                        preferences.edit().putBoolean("status_update", false).commit();
+                        Log.d("Status updated for me: ", contact_id);
+
+                    }else {
+                        Log.d("Status updated for: ", contact_id);
+                        db.updateContactStatus(contact_id, status);
+                    }
+                    if(data.has("category")){
+                        JSONObject arg = new JSONObject();
+                        arg.put("_id", data.getString("_id"));
+                        socket.emit("remove-pending", arg);
+                    }
+                }catch (Exception e){
+
+                }
             }
         };
 
@@ -170,6 +284,11 @@ public class ChatService extends Service {
                     ack.put("_id",message.Message_Id);
                     socket.emit("private-delivered-ack",ack);
 
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject arg = new JSONObject();
+                        arg.put("_id", message.Message_Id);
+                        socket.emit("remove-pending", arg);
+                    }
                     Tools.smallNotification(getApplicationContext(),message.Body,"Private Message");
                     sendPrivateBroadCast(message, Constants.NEW_MESSAGE);
                 }catch (Exception e){
@@ -192,13 +311,18 @@ public class ChatService extends Service {
                     message.PostedTime = data.getString("datetime");
 
                     db.updateMessage(message, SqlHelper.MESSAGE_POSTED);
-                    db.updateMessageView(db.getContactId(message.Message_Id),message.Message_Id,SqlHelper.MESSAGE_VIEW_NO_INCREMENT);
+                    db.updateMessageView(db.getContactId(message.Message_Id),message.Message_Id, message.Local_Id,SqlHelper.MESSAGE_VIEW_MESSAGE_POSTED);
 
                     Log.d("OnPrivatePosted",message.Message_Id);
                     JSONObject ack = new JSONObject();
                     ack.put("_id", message.Message_Id);
                     socket.emit("private-id-received", ack);
 
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject arg = new JSONObject();
+                        arg.put("_id", message.Message_Id);
+                        socket.emit("remove-pending", arg);
+                    }
                     sendPrivateBroadCast(message, Constants.MESSAGE_POSTED);
                 }catch (Exception e){
                     Log.d("OnPrivatePosted",e.getMessage());
@@ -219,8 +343,13 @@ public class ChatService extends Service {
 
                     db.updateMessage(message, SqlHelper.MESSAGE_DELIVERED);
 Log.d("Delivered",message.Message_Id);
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject arg = new JSONObject();
+                        arg.put("_id", message.Message_Id);
+                        socket.emit("remove-pending", arg);
+                    }
                     sendPrivateBroadCast(message, Constants.MESSAGE_DELIVERED);
-                }catch (JSONException e){}
+                }catch (Exception e){}
             }
         };
 
@@ -248,9 +377,14 @@ Log.d("Group-message: ", message.Group_Id+", From: "+message.From);
 
                     socket.emit("group-message-delivery-ack",ack);
 
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject arg = new JSONObject();
+                        arg.put("_id", message.Message_Id);
+                        socket.emit("remove-pending", arg);
+                    }
                     Tools.smallNotification(getApplicationContext(),message.Body,"Group Message");
                     sendGroupBroadCast(message, Constants.NEW_MESSAGE);
-                }catch (JSONException e){
+                }catch (Exception e){
                     Log.d("Group-Message",e.getMessage());
                 }
             }
@@ -269,14 +403,19 @@ Log.d("Group-message: ", message.Group_Id+", From: "+message.From);
                     message.PostedTime = data.getString("datetime");
 
                     db.updateMessage(message, SqlHelper.MESSAGE_POSTED);
-                    db.updateMessageView(db.getContactId(message.Message_Id),message.Message_Id,SqlHelper.MESSAGE_VIEW_NO_INCREMENT);
+                    db.updateMessageView(db.getContactId(message.Message_Id),message.Message_Id,message.Local_Id,SqlHelper.MESSAGE_VIEW_MESSAGE_POSTED);
 
                     JSONObject arg = new JSONObject();
                     arg.put("_id", message.Message_Id);
                     socket.emit("group-id-received", arg);
 
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject ack = new JSONObject();
+                        ack.put("_id", message.Message_Id);
+                        socket.emit("remove-pending", ack);
+                    }
                     sendGroupBroadCast(message, Constants.MESSAGE_POSTED);
-                }catch (JSONException e){
+                }catch (Exception e){
                     Log.d("Group-Posted",e.getMessage());
                 }
             }
@@ -296,8 +435,13 @@ Log.d("Group-message: ", message.Group_Id+", From: "+message.From);
 Log.d("Group-Delivered",message.From);
                     db.addGroupMessageMeta(message);
 
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject ack = new JSONObject();
+                        ack.put("_id", message.Message_Id);
+                        socket.emit("remove-pending", ack);
+                    }
                     sendGroupBroadCast(message, Constants.MESSAGE_DELIVERED);
-                }catch (JSONException e){}
+                }catch (Exception e){}
             }
         };
 
@@ -321,6 +465,7 @@ Log.d("Group-Delivered",message.From);
                     sendBroadcast(broadcast);
 
                     socket.emit("group-create-id-received-ack",arg);
+
                 }catch (Exception e){
                     e.printStackTrace();
                 }
@@ -352,6 +497,11 @@ Log.d("Group-Delivered",message.From);
                     db.insertGroupMap(group_id,Members);
                     addNewGroupContact(data);
 
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject ack = new JSONObject();
+                        ack.put("group_id", group_id);
+                        socket.emit("remove-pending", ack);
+                    }
                     Tools.smallNotification(getApplicationContext(),group_id,"Added to new group");
                 }catch (Exception e){
                     e.printStackTrace();
@@ -380,7 +530,13 @@ Log.d("GroupMembersAdded","Added");
 
                         members.add(gm);
                     }
-                db.insertGroupMap(group_id,members);
+                    db.insertGroupMap(group_id,members);
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject ack = new JSONObject();
+                        ack.put("_id", group_id);
+                        socket.emit("remove-pending", ack);
+                    }
+
                 sendGroupMembersBroadcast(group_id,members, Constants.GROUP_MEMBERS_ADDED);
                 }catch (JSONException e){}
             }
@@ -409,6 +565,11 @@ Log.d("Members-Removed",gm.Contact_Id);
                         members.add(gm);
                     }
                     db.deleteGroupMap(group_id, members);
+                    if(data.has("category")){ //if message received from pending queue fromm server, send ack to free pending queue
+                        JSONObject ack = new JSONObject();
+                        ack.put("_id", group_id);
+                        socket.emit("remove-pending", ack);
+                    }
                     sendGroupMembersBroadcast(group_id,members, Constants.GROUP_MEMBERS_REMOVED);
                 }catch (JSONException e){}
             }
@@ -434,6 +595,7 @@ Log.d("Members-Removed",gm.Contact_Id);
         socket.disconnect();
         socket.off("connected", onConnected);
         socket.off("disconnected", onDisconnected);
+        socket.off("status-changed", onStatusChanged);
         socket.off("private-message", onPrivateMessage);
         socket.off("private-posted", onPrivatePosted);
         socket.off("private-delivery-receipt", onPrivateDeliveryReceipt);
@@ -511,12 +673,12 @@ Log.d("Members-Removed",gm.Contact_Id);
                 intent.putExtra("local_id", message.Local_Id);
                 intent.putExtra("message_id", message.Message_Id);
                 intent.putExtra("contact_id", message.Group_Id);
-                intent.putExtra("name", db.getContactName(message.Contact_Id));
-                intent.putExtra("from", db.getContactName(message.From));
+                intent.putExtra("name", db.getContactName(message.From));
+                intent.putExtra("from", message.From);
+                intent.putExtra("sender_name", db.getContactName(message.From));
                 intent.putExtra("body",message.Body);
                 intent.putExtra("type", message.Type);
                 intent.putExtra("posted_time", message.PostedTime);
-                intent.putExtra("from", message.From);
 
             break;
 
@@ -571,7 +733,7 @@ Log.d("Members-Removed",gm.Contact_Id);
                 break;
         }
     }
-//Handle when user tries to modify group
+//Handle when user tries to modify group (Sent by current user)
     void handleGroupBroadcast(Intent intent){
         switch (intent.getIntExtra("category",0)){
 
@@ -594,6 +756,25 @@ Log.d("Members-Removed",gm.Contact_Id);
         }
     }
 
+    void handleStatusBroadcast(Intent intent){
+
+        switch (intent.getIntExtra("category",0)){
+
+            case Constants.CHECK_CONTACT_ONLINE:
+                checkContactOnline(intent);
+                break;
+        }
+
+    }
+
+    void handleUserSettingBroadcast(Intent intent){
+        switch (intent.getIntExtra("category", 0)){
+
+            case Constants.UPDATE_USER_STATUS:
+                updateUserStatus(intent);
+                break;
+        }
+    }
 
     void sendPrivateMessage(Intent intent){
 
@@ -636,7 +817,7 @@ Log.d("Members-Removed",gm.Contact_Id);
 
         try {
             ArrayList<ParcelContacts> Contacts = intent.getParcelableArrayListExtra("Contacts");
-            Contacts.add(new ParcelContacts(user.ID, user.Name, "","")); //Add myself to group
+            Contacts.add(new ParcelContacts(user.ID, user.Name,"","")); //Add myself to group
             JSONArray array = new JSONArray();
 
             for(int i=0; i< Contacts.size(); i++){
@@ -663,7 +844,7 @@ Log.d("Members-Removed",gm.Contact_Id);
             Contact contact = new Contact();
             contact.Contact_Id = data.getString("group_id");
             contact.Join_Date = data.getString("datetime");
-            contact.Name = data.getString("name");
+            contact.Name = data.getString("name"); //Group Name
             contact.Type = Constants.CONTACT_TYPE_GROUP;
 
             Log.d("AddedToNewGroup", contact.Name);
@@ -681,9 +862,10 @@ Log.d("Members-Removed",gm.Contact_Id);
                 message.PostedTime = contact.Join_Date;
 
                 db.insertMessage(message, Constants.MESSAGE_RECEIVE);
+                BroadCastGroupJoined(contact.Name, message);
             }
 
-        } catch (JSONException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -788,6 +970,24 @@ Log.d("Members-Removed",gm.Contact_Id);
         }
     }
 
+    void BroadCastGroupJoined(String GroupName, Message message){
+        Intent broadcast = new Intent();
+        broadcast.setAction(Constants.NEW_MESSAGE_FILTER);
+        broadcast.putExtra("message_type",Constants.NEW_MESSAGE);
+
+        broadcast.putExtra("category", Constants.CATEGORY_GROUP_MESSAGE);
+        broadcast.putExtra("contact_id", message.Contact_Id);
+        broadcast.putExtra("message_id", message.Message_Id);
+        broadcast.putExtra("name", GroupName);
+        broadcast.putExtra("sender_name", GroupName);
+        broadcast.putExtra("from", message.From);
+        broadcast.putExtra("body", message.Body);
+        broadcast.putExtra("type", "group-create");
+        broadcast.putExtra("posted_time", message.PostedTime);
+
+        sendBroadcast(broadcast);
+    }
+
     void broadcastGroupExited(String group_id, int status){
         Intent intent = new Intent();
         intent.setAction(Constants.GROUP_EXIT_FILTER);
@@ -795,5 +995,46 @@ Log.d("Members-Removed",gm.Contact_Id);
         intent.putExtra("status", status);
 
         sendBroadcast(intent);
+    }
+
+    void checkContactOnline(Intent intent){
+
+        try {
+            JSONObject arg = new JSONObject();
+            arg.put("_id", intent.getStringExtra("contact_id"));
+
+            if(socket.connected()){
+                socket.emit("check-user-online", arg);
+            }else{
+                Toast.makeText(getApplicationContext(),"Could not get online status of user!",Toast.LENGTH_SHORT).show();
+            }
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    void updateUserStatus(Intent intent){
+        JSONObject arg = new JSONObject();
+        try {
+            arg.put("user_id", intent.getStringExtra("contact_id"));
+            arg.put("status", intent.getStringExtra("status"));
+
+            if(socket.connected())
+                socket.emit("status-update",arg);
+            Log.d("Updating status", arg.getString("status"));
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        unregisterReceiver(receiver);
+        unregisterReceiver(group_receiver);
+        unregisterReceiver(status_receiver);
+        unregisterReceiver(user_setting);
+        db.close();
+        super.onTaskRemoved(rootIntent);
     }
 }

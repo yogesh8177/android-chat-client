@@ -51,6 +51,7 @@
                             android:id="@+id/posted_date"
                             android:text="12/06/2016"
                             android:padding="5dp"
+                            android:textColor="@android:color/holo_orange_dark"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_alignParentRight="true" />
@@ -80,8 +81,10 @@
                         <TextView
                             android:id="@+id/count"
                             android:text="2"
-                            android:padding="5dp"
-                            android:background="@color/colorAccent"
+                            android:padding="3dp"
+                            android:textStyle="bold"
+                            android:layout_marginRight="15dp"
+                            android:background="@android:color/holo_orange_dark"
                             android:textColor="#fff"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"

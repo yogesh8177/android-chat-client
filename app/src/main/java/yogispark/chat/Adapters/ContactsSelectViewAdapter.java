@@ -8,6 +8,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Dictionary;
 import java.util.HashMap;
@@ -26,12 +27,13 @@ public class ContactsSelectViewAdapter extends RecyclerView.Adapter<ContactsView
     Context context;
     ArrayList<Contact> Contacts;
     ArrayList<ParcelContacts> SelectedContacts;
-
+    SimpleDateFormat dateFormat;
 
     public ContactsSelectViewAdapter(Context context, ArrayList<Contact> Contacts){
         this.context = context;
         this.Contacts = Contacts;
         SelectedContacts = new ArrayList<>();
+        dateFormat = new SimpleDateFormat("yyyy-MM-dd");
     }
 
     @Override
@@ -44,7 +46,7 @@ public class ContactsSelectViewAdapter extends RecyclerView.Adapter<ContactsView
     public void onBindViewHolder(final ContactsViewHolder holder, final int position) {
         holder.getContactName().setText(Contacts.get(position).Name);
         holder.getContactStatus().setText(Contacts.get(position).Status);
-        holder.getJoinDate().setText(Contacts.get(position).Join_Date);
+        holder.getJoinDate().setText(Contacts.get(position).Join_Date!= null ? Contacts.get(position).Join_Date : "");
 
         holder.getCardView().setOnClickListener(new View.OnClickListener() {
             @Override
@@ -52,7 +54,7 @@ public class ContactsSelectViewAdapter extends RecyclerView.Adapter<ContactsView
 
                 Contacts.get(position).isSelected = !Contacts.get(position).isSelected;
                 if(Contacts.get(position).isSelected)
-                    holder.getCardView().setCardBackgroundColor(Color.GREEN);
+                    holder.getCardView().setCardBackgroundColor(Color.YELLOW);
                 else
                     holder.getCardView().setCardBackgroundColor(Color.WHITE);
 
@@ -70,7 +72,7 @@ public class ContactsSelectViewAdapter extends RecyclerView.Adapter<ContactsView
     void addToSelectedList(int position){
         boolean exists = false;
 
-        ParcelContacts contact = new ParcelContacts(Contacts.get(position).Contact_Id, Contacts.get(position).Name, Contacts.get(position).Status, Contacts.get(position).Join_Date);
+        ParcelContacts contact = new ParcelContacts(Contacts.get(position).Contact_Id, Contacts.get(position).Name, Contacts.get(position).Status, Contacts.get(position).Join_Date != null ? Contacts.get(position).Join_Date.toString() : "");
         if(SelectedContacts.size() == 0){
             SelectedContacts.add(contact);//Log.d("First Added:", contact.Contact_Name+", size: "+SelectedContacts.size());
         }else{

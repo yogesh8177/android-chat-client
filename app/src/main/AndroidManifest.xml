@@ -66,7 +66,8 @@
         <activity
             android:name=".UI.MemberInfo"
             android:label="@string/title_activity_member_info"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity android:name=".UI.UserSetting"></activity>
     </application>
 
 </manifest>

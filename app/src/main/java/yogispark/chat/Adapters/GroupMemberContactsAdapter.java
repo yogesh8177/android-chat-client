@@ -1,6 +1,7 @@
 package yogispark.chat.Adapters;
 
 import android.content.Context;
+import android.net.Uri;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
@@ -16,6 +17,7 @@ import yogispark.chat.Dialogs.GroupMemberInfo;
 import yogispark.chat.Models.Contact;
 import yogispark.chat.R;
 import yogispark.chat.UI.GroupInfo;
+import yogispark.chat.Utility.Constants;
 import yogispark.chat.ViewHolder.ChatViewHolder;
 import yogispark.chat.ViewHolder.ContactsViewHolder;
 
@@ -45,7 +47,10 @@ public class GroupMemberContactsAdapter extends RecyclerView.Adapter<ContactsVie
     public void onBindViewHolder(ContactsViewHolder holder,final int position) {
         holder.getContactName().setText(Contacts.get(position).Name);
         holder.getContactStatus().setText(Contacts.get(position).Status);
-        holder.getJoinDate().setText(Contacts.get(position).Join_Date.substring(0,6));
+        holder.getJoinDate().setText(Contacts.get(position).Join_Date !=null ? Contacts.get(position).Join_Date : "");
+
+        Uri uri = Uri.parse("android.resource://yogispark.chat/drawable/ic_action_contact");
+        holder.getProfileImage().setImageURI(uri);
 
         holder.getCardView().setOnClickListener(new View.OnClickListener() {
             @Override

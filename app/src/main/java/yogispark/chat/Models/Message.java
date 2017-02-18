@@ -1,5 +1,7 @@
 package yogispark.chat.Models;
 
+import java.util.Date;
+
 /**
  * Created by yogesh on 2/10/16.
  */
@@ -20,4 +22,6 @@ public class Message {
     public String DeliveryTime;
     public String ReadTime;
     public String DeliveredTo;
+    public String DateIndicator;
+    public boolean showDateIndicator = false;
 }

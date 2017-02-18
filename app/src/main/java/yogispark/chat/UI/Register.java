@@ -21,6 +21,7 @@ public class Register extends AppCompatActivity {
 
     EditText user_name, email, mobile, password;
     Button register_button;
+    BroadcastReceiver receiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,7 +49,7 @@ public class Register extends AppCompatActivity {
             }
         });
 
-        BroadcastReceiver receiver = new BroadcastReceiver(){
+        receiver = new BroadcastReceiver(){
 
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -88,5 +89,11 @@ public class Register extends AppCompatActivity {
     void startChatService(){
         Intent chatService = new Intent(this, ChatService.class);
         startService(chatService);
+    }
+
+    @Override
+    protected void onDestroy() {
+        unregisterReceiver(receiver);
+        super.onDestroy();
     }
 }

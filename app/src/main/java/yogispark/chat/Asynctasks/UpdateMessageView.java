@@ -19,7 +19,7 @@ public class UpdateMessageView extends AsyncTask<String, Void, Void> {
     @Override
     protected Void doInBackground(String... params) {
         SqlHelper helper = new SqlHelper(context);
-        helper.updateMessageView(params[0], params[1], SqlHelper.MESSAGE_VIEW_INCREMENT);
+        helper.updateMessageView(params[0], params[1], 0l, SqlHelper.MESSAGE_VIEW_INCREMENT);
         Log.d("MV","ID:"+params[1]);
         return null;
     }

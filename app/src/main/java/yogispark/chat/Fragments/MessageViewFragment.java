@@ -11,6 +11,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -23,7 +24,9 @@ import yogispark.chat.DataBase.SqlHelper;
 import yogispark.chat.Models.GroupMember;
 import yogispark.chat.Models.MessageView;
 import yogispark.chat.R;
+import yogispark.chat.UI.ChatView;
 import yogispark.chat.Utility.Constants;
+import yogispark.chat.Utility.Tools;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -33,7 +36,9 @@ public class MessageViewFragment extends Fragment {
     RecyclerView recyclerView;
     MessageViewRecyclerAdapter adapter;
     ArrayList<MessageView> Messages;
-    BroadcastReceiver receiver;
+    BroadcastReceiver receiver, receiver2;
+    String CURRENT_USER;
+    SqlHelper helper;
 
     public static MessageViewFragment newInstance(){
         MessageViewFragment fragment = new MessageViewFragment();
@@ -47,13 +52,17 @@ public class MessageViewFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        helper = new SqlHelper(getContext());
+        CURRENT_USER = helper.getUser().ID;
+
         Messages = new ArrayList<>();
         adapter = new MessageViewRecyclerAdapter(getContext(),Messages);
         receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 if(intent.getAction().equals(Constants.NEW_MESSAGE_FILTER)){
-                    if(intent.getIntExtra("message_type",0) == Constants.NEW_MESSAGE)
+                    if(intent.getIntExtra("message_type",0) == Constants.NEW_MESSAGE || intent.getIntExtra("message_type",0) == Constants.MESSAGE_POSTED)
                         updateMessageView(intent);
                 }
             }
@@ -62,17 +71,33 @@ public class MessageViewFragment extends Fragment {
         filter.addAction(Constants.NEW_MESSAGE_FILTER);
         getActivity().registerReceiver(receiver,filter);
 
+        receiver2 = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                updateMessageView(intent);
+            }
+        };
+        IntentFilter filter2 = new IntentFilter();
+        filter2.addAction(Constants.SEND_MESSAGE_FILTER);
+        getActivity().registerReceiver(receiver2,filter2);
+
     }
 
     private void updateMessageView(Intent intent) {
         int type = intent.getIntExtra("category",0);
         switch (type){
             case Constants.CATEGORY_PRIVATE_MESSAGE:
-                addPrivateMessage(intent);
+                if(intent.getIntExtra("message_type",0) == Constants.MESSAGE_POSTED)
+                    updateMessagePosted(intent);
+                else
+                    addPrivateMessage(intent);
             break;
 
             case Constants.CATEGORY_GROUP_MESSAGE:
-                addGroupMessage(intent);
+                if(intent.getIntExtra("message_type",0) == Constants.MESSAGE_POSTED)
+                    updateMessagePosted(intent);
+                else
+                    addGroupMessage(intent);
             break;
 
             default:
@@ -118,23 +143,26 @@ public class MessageViewFragment extends Fragment {
     public void onDestroy() {
         super.onDestroy();
         getActivity().unregisterReceiver(receiver);
+        getActivity().unregisterReceiver(receiver2);
     }
 
 
 
     private void addPrivateMessage(Intent intent) {
         MessageView message = new MessageView();
+        message.Local_Id = intent.getLongExtra("local_id",0);
         message.Contact_Id = intent.getStringExtra("contact_id");
         message.Contact_Name = intent.getStringExtra("name");
         message.Message_Id = intent.getStringExtra("message_id");
+        message.From = intent.getStringExtra("from");
         message.Body = intent.getStringExtra("body");
-        message.Posted_Date = intent.getStringExtra("posted_time").substring(0,11);
+        message.Posted_Date = intent.getStringExtra("posted_time") !=null ? Tools.parseISODate(intent.getStringExtra("posted_time")) : "";
         message.Category = intent.getIntExtra("category",0);
 
         int index=-1;
         for(int i=0; i<Messages.size(); i++){
             if(Messages.get(i).Contact_Id.equals(message.Contact_Id)){
-                message.Count = Messages.get(i).Count+1;
+                message.Count = message.From.equals(CURRENT_USER) || message.Contact_Id.equals(ChatView.CONTACT_ID) ? 0 : Messages.get(i).Count+1;
                 message.Contact_Name = Messages.get(i).Contact_Name;
                 Messages.remove(i);
                 Messages.add(i,message);
@@ -153,18 +181,20 @@ public class MessageViewFragment extends Fragment {
 
     private void addGroupMessage(Intent intent) {
         MessageView message = new MessageView();
+        message.Local_Id = intent.getLongExtra("local_id",0);
         message.Contact_Id = intent.getStringExtra("contact_id");
         message.Contact_Name = intent.getStringExtra("name");
-        message.From = intent.getStringExtra("From");
+        message.From = intent.getStringExtra("from");
+        String Sender_Name = intent.getStringExtra("sender_name") != null ? intent.getStringExtra("sender_name") : "Unknown";
         message.Message_Id = intent.getStringExtra("message_id");
-        message.Body = intent.getStringExtra("body");
-        message.Posted_Date = intent.getStringExtra("posted_time").substring(0,11);
+        message.Body = Sender_Name + ": "+ intent.getStringExtra("body");
+        message.Posted_Date = intent.getStringExtra("posted_time") !=null ? Tools.parseISODate(intent.getStringExtra("posted_time")) : "";
         message.Category = intent.getIntExtra("category",0);
 
         int index=-1;
         for(int i=0; i<Messages.size(); i++){
             if(Messages.get(i).Contact_Id.equals(message.Contact_Id)){
-                message.Count = Messages.get(i).Count+1;
+                message.Count = message.From.equals(CURRENT_USER) || message.Contact_Id.equals(ChatView.CONTACT_ID) ? 0 : Messages.get(i).Count+1; //If message is sent by current user, dont update count. Update count only if other person sends
                 message.Contact_Name = Messages.get(i).Contact_Name;
                 Messages.remove(i);
                 Messages.add(i,message);
@@ -177,6 +207,22 @@ public class MessageViewFragment extends Fragment {
             message.Count = 1;
             Messages.add(message);
             adapter.notifyItemInserted(Messages.size() - 1);
+        }
+    }
+
+    void updateMessagePosted(Intent intent){
+        Log.d("PostedMessageview", "Meow");
+        Long local_id = intent.getLongExtra("local_id", 0);
+        String message_id = intent.getStringExtra("message_id");
+        String posted_time = intent.getStringExtra("posted_time");
+
+        for(int i=0; i<Messages.size(); i++){
+            if(Messages.get(i).Local_Id == local_id){
+                Messages.get(i).Posted_Date = Tools.parseISODate(posted_time);
+                Messages.get(i).Message_Id = message_id;
+                adapter.notifyItemChanged(i);
+
+            }
         }
     }
 

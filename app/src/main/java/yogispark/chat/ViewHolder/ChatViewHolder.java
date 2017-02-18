@@ -3,6 +3,7 @@ package yogispark.chat.ViewHolder;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import yogispark.chat.R;
@@ -16,6 +17,8 @@ public class ChatViewHolder extends RecyclerView.ViewHolder {
     TextView contactStatus;
     TextView message;
     TextView postedDate;
+    TextView dateIndicator;
+    ImageView ticks;
 
     public ChatViewHolder(View itemView) {
         super(itemView);
@@ -24,6 +27,8 @@ public class ChatViewHolder extends RecyclerView.ViewHolder {
         contactStatus = (TextView) cardView.findViewById(R.id.chat_contact_status);
         message = (TextView) cardView.findViewById(R.id.chat_message);
         postedDate = (TextView) cardView.findViewById(R.id.chat_post_date);
+        dateIndicator = (TextView) cardView.findViewById(R.id.date_indicator);
+        ticks = (ImageView) cardView.findViewById(R.id.ticks);
     }
 
     public CardView getCardView() {
@@ -64,5 +69,21 @@ public class ChatViewHolder extends RecyclerView.ViewHolder {
 
     public void setPostedDate(TextView postedDate) {
         this.postedDate = postedDate;
+    }
+
+    public TextView getDateIndicator() {
+        return dateIndicator;
+    }
+
+    public void setDateIndicator(TextView dateIndicator) {
+        this.dateIndicator = dateIndicator;
+    }
+
+    public ImageView getTicks() {
+        return ticks;
+    }
+
+    public void setTicks(ImageView ticks) {
+        this.ticks = ticks;
     }
 }

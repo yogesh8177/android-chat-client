@@ -2,6 +2,8 @@ package yogispark.chat.UI;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
@@ -42,6 +44,8 @@ public class ChatView extends AppCompatActivity {
 
         setToolBar(this, toolbar);
 
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+
         fragmentManager = getSupportFragmentManager();
         if(savedInstanceState==null){
 
@@ -58,6 +62,11 @@ public class ChatView extends AppCompatActivity {
 
             new ResetMessageCount(this,CONTACT_ID).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
             setTitle(Category == Constants.CATEGORY_GROUP_MESSAGE ? "Group: "+CONTACT_NAME : CONTACT_NAME);
+        }else{
+            Category = savedInstanceState.getInt("Category");
+            CONTACT_ID = savedInstanceState.getString("Contact_Id");
+            CONTACT_NAME = savedInstanceState.getString("Contact_Name");
+            setTitle(Category == Constants.CATEGORY_GROUP_MESSAGE ? "Group: "+CONTACT_NAME : CONTACT_NAME);
         }
         Log.d("CONTACT",CONTACT_ID);
     }
@@ -65,7 +74,10 @@ public class ChatView extends AppCompatActivity {
     void setToolBar(final Context context, Toolbar toolbar){
 
         Contact_Info = new Button(context);
-        Contact_Info.setText("i");
+        Contact_Info.setBackgroundColor(Color.TRANSPARENT);
+        Drawable icon = getDrawable(R.drawable.ic_action_info);
+        icon.setBounds(0,0,120,120);
+        Contact_Info.setCompoundDrawables(icon,null,null,null);
         Contact_Info.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -84,6 +96,18 @@ public class ChatView extends AppCompatActivity {
         toolbar.addView(Contact_Info);
     }
 
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putString("Contact_Id", CONTACT_ID);
+        outState.putInt("Category", Category);
+        outState.putString("Contact_Name", CONTACT_NAME);
+        super.onSaveInstanceState(outState);
+    }
 
-
+    @Override
+    protected void onDestroy() {
+        CONTACT_ID = null;
+        Category = 0;
+        super.onDestroy();
+    }
 }

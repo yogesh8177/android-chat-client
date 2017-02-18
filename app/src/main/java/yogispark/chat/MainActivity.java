@@ -25,6 +25,7 @@ import yogispark.chat.Service.ChatService;
 import yogispark.chat.Service.SyncContacts;
 import yogispark.chat.UI.ContactSelect;
 import yogispark.chat.UI.Register;
+import yogispark.chat.UI.UserSetting;
 import yogispark.chat.Utility.Constants;
 
 public class MainActivity extends AppCompatActivity
@@ -89,6 +90,8 @@ public class MainActivity extends AppCompatActivity
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            Intent intent = new Intent(MainActivity.this, UserSetting.class);
+            startActivity(intent);
             return true;
         }else if(id == R.id.action_new_group){
             Intent intent = new Intent(this, ContactSelect.class);

@@ -12,6 +12,9 @@ public class Constants {
     public static final String GROUP_FILTER = "yogispark.chat.group";
     public static final String GROUP_CREATED_FILTER = "yogispark.chat.group_created";
     public static final String GROUP_EXIT_FILTER = "yogispark.chat.group_exit";
+    public static final String CONTACT_STATUS_FILTER = "yogispark.chat.contact_status";
+    public static final String UPDATE_USER_SETTING_FILTER = "yogispark.chat.update_user_setting";
+
 
     public static final String SOCKET_URL = "http://192.168.43.15:3000";
     public static final String REGISTER_URL = "http://192.168.43.15:3000/api/register";
@@ -41,6 +44,11 @@ public class Constants {
 
     public static int CONTACT_SELECT_FOR_NEW_GROUP = 30;
     public static int CONTACT_SELECT_FOR_ADD_TO_GROUP = 40;
+
+    public static final int CHECK_CONTACT_ONLINE = 50;
+    public static final int CHECK_CONTACT_ONLINE_RESULT = 60;
+
+    public static final int UPDATE_USER_STATUS = 61;
 
     public static final String CONTACT_TYPE_PRIVATE = "private";
     public static final String CONTACT_TYPE_GROUP = "group";

@@ -15,6 +15,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 
 import yogispark.chat.DataBase.SqlHelper;
 import yogispark.chat.Models.Contact;
@@ -32,6 +34,7 @@ public class FetchContacts extends IntentService {
 
     HttpURLConnection connection;
     SqlHelper helper;
+    SimpleDateFormat dateFormat;
     PowerManager powerManager;
     PowerManager.WakeLock wakeLock;
 
@@ -46,6 +49,7 @@ public class FetchContacts extends IntentService {
         wakeLock.acquire();
 
         try{
+            dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH);
             String parameter = "?datetime=" + getLatestContactDateTime();
             helper = new SqlHelper(getApplicationContext());
 
@@ -76,7 +80,7 @@ public class FetchContacts extends IntentService {
 
                 helper.insertContact(contact);
                 if(i == size-1) //If last contact having latest join date
-                    addLatestContactDateTime(contact.Join_Date);
+                    addLatestContactDateTime(contact.Join_Date.toString());
             }
 
             Tools.smallNotification(getApplicationContext(),size+" New contacts were added","New Contacts");

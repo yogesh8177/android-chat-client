@@ -1,5 +1,7 @@
 package yogispark.chat.Models;
 
+import java.util.Date;
+
 /**
  * Created by yogesh on 3/10/16.
  */
